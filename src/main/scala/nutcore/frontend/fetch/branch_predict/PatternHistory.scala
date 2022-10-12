@@ -9,7 +9,7 @@ import nutcore._
 import utils._
 import top.Settings 
  
-class PatternHistory(val sets: Int, val entryNum: Int, val addr: EntryAddr) extends Module {
+class PatternHistory(val sets: Int, val entryNum: Int, val addr: EntryAddr) extends NutCoreModule {
 
   val io = IO(new Bundle {
 

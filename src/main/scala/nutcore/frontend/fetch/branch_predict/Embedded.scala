@@ -43,10 +43,10 @@ class Embedded extends NutCoreModule {
   // val phtTaken = RegEnable(pht.read(btbAddr.getIdx(io.in.pc.bits))(1), io.in.pc.valid)
 
   // RAS
-  val NRras = 16
-  val ras = Mem(NRras, UInt(32.W))
-  val sp = Counter(NRras)
-  val rasTarget = RegEnable(ras.read(sp.value), io.in.pc.valid)
+  // val NRras = 16
+  // val ras = Mem(NRras, UInt(32.W))
+  // val sp = Counter(NRras)
+  // val rasTarget = RegEnable(ras.read(sp.value), io.in.pc.valid)
 
   // update
   val req = WireInit(0.U.asTypeOf(new BranchPredictUpdateRequestPort))
@@ -60,6 +60,14 @@ class Embedded extends NutCoreModule {
     pc=io.in.pc,
     req=req
   )(0)
+
+
+  val rasTarget = ReturnAddressStack(
+    stackSize=NRras,
+    pc=io.in.pc,
+    req=req
+  )
+
 
   btbWrite.tag := btbAddr.getTag(req.pc)
   btbWrite.target := req.actualTarget
@@ -84,15 +92,15 @@ class Embedded extends NutCoreModule {
   //     pht.write(btbAddr.getIdx(reqLatch.pc), newCnt)
   //   }
   // }
-  when (req.valid) {
-    when (req.fuOpType === ALUOpType.call) {
-      ras.write(sp.value + 1.U, req.pc + 4.U)
-      sp.value := sp.value + 1.U
-    }
-    .elsewhen (req.fuOpType === ALUOpType.ret) {
-      sp.value := sp.value - 1.U
-    }
-  }
+  // when (req.valid) {
+  //   when (req.fuOpType === ALUOpType.call) {
+  //     ras.write(sp.value + 1.U, req.pc + 4.U)
+  //     sp.value := sp.value + 1.U
+  //   }
+  //   .elsewhen (req.fuOpType === ALUOpType.ret) {
+  //     sp.value := sp.value - 1.U
+  //   }
+  // }
 
   val flushBTB = WireInit(false.B)
   val flushTLB = WireInit(false.B)

@@ -1,206 +1,70 @@
 
-// package nutcore.fetch.branch_predict
+class BranchTarget(val entryNum:Int, val sets:Int) extends NutCoreModule {
 
-// import chisel3._
-// import chisel3.util._
-// import chisel3.util.experimental.BoringUtils
-// import nutcore._
+  def entry() = new Bundle {
+    val tag = UInt(entryAddr.tagBits.W)
+    val _type = UInt(2.W)
+    val target = UInt(32.W)
 
-// import utils._
-// import top.Settings
+    // used by Dynamic
+    val crosslineJump = Bool()
+    val valid = Bool()
 
-// // NOTE: BranchTargetBuffer
-// // ========================
-// // BranchTargetBuffer is excerpted from the BPU part of the origianl NutShell. We made several
-// // modifications:
-// //
-// // 1. It was not a module. Now we make it one.
-// //
-// // 2. The update request was not transferred through standard IO port (by "boring in"). Now we
-// //    make it is.
-// // 
-// // Currently we are working on the Embedded version, since:
-// // 1. We are not dealing with Dynamic Execution yet
-// // 2. The main difference between BPU_embedded and BPU_inorder is RVC, the compressed instrs.
-// //    We are not dealing with RVC either.
-// //  
-// // Will be coping with that soon.
+    // used by Sequential
+    val brIdx = Output(UInt(3.W))
+    val flush = Input(Bool())
 
-// // Found at:
-// // https://github.com/OSCPU/NutShell/blob/fd86beadfc47f52973270ce6109edebd2a30363b/src/main/scala/nutcore/frontend/BPU.scala#L74
-// // 
-// // Docs:
-// // https://oscpu.gitbook.io/nutshell/gong-neng-bu-jian-she-ji-xi-jie/bpu#yu-ce-ji-zhi
+  }
 
+  val io = IO(new Bundle {
 
-// object BoolStopWatch {
-//   def apply(start: Bool, close: Bool, startHighPriority: Boolean = false) = {
+    val pc = Flipped(Valid((UInt(32.W))))
 
-//     val state = RegInit(false.B)
-    
-//     if (startHighPriority) {
-//       when (close) { state := false.B }
-//       when (start) { state := true.B }
-//     }
-//     else {
-//       when (start) { state := true.B }
-//       when (close) { state := false.B }
-//     }
+    val out = Output(Vec(sets, entry()))
 
-//     state
-//   }
-// }
+    // Originally connected via BoringUtil
+    val req = new BranchPredictUpdateRequestPort()
+  })
 
-// class TargetBuffer(sets: Int, addr: EntryAddr) extends Module with Formal{
+  val flush = BoolStopWatch(io.flush, io.in.pc.valid, startHighPriority = true)
 
-//   val entryType = new Bundle {
-//     val tag        = UInt(addr.TAG_LEN.W)
-//     val branchType = UInt(2.W)
-//     val target     = UInt(32.W)
-//   }
-
-//   val io = IO(new Bundle {
-
-//     val in = new BranchPredictUpdateRequestPort()
-
-//     val out = Output(entryType)
-//     val hit = Output(Bool())
-//   })
-
-//   // Define the flush signal. mem will be set flush when io.flush fired, until
-//   // next valid pc comes in.
-
-//   val flush = BoolStopWatch(io.in.flush, io.in.pc.valid, startHighPriority = true)
-
-//   // ==========================================================================
-//   // FORMAL VERIFICATION
-//   //
-//   // 1. When the incoming flush signal is true, the flush will be always true
-//   //    IN THE NEXT CYCLE.
-//   //
-//   // 2. When incoming flush is false, the outcome flush depends on the incoming
-//   //    valid signal and previous flush stored in the register.
-
-//   // **Assertions that NOT working, wondering WHY?**
+  val entryNum = 512
+  val entryNumPerSet = entryNum / sets
+  val entryAddr = new EntryAddr(log2Up(entryNumPerSet))
   
-//   // val prevFlush = ShiftRegister(io.in.flush, 1)
-//   // val prevValid = ShiftRegister(io.in.pc.valid, 1)
-//   // when (prevFlush) {
-//   //   assert(flush === true.B)
-//   // }.elsewhen(prevValid) {
-//   //   assert(flush === false.B)
-//   // }.otherwise{
-//   //   assert(flush === RegNext(flush))
-//   // }
+  // val branchTarget = Module(new SRAMTemplate(entry(), set = entryNum, shouldReset = true, holdRead = true, singlePort = true))
+  val branchTarget = List.fill(sets)(
+    Module(new SRAMTemplate(
+      entry(), 
+      set = entryNumPerSet, 
+      shouldReset = true, 
+      holdRead = true, 
+      singlePort = true
+    ))
+  )
 
-//   past(io.in.flush, 1) {
-//     prevFlush => when(prevFlush) {
-//       assert(flush === true.B)
-//     }
-//     .otherwise {
-//       past(io.in.pc.valid, 1){
-//         prevValid => when(prevValid) {
-//           assert( flush === false.B) 
-//           }.otherwise {
-//             assert(flush === RegNext(flush))
-//           }
-//       }
-//     }
-//   }
+  // flush BTB when executing fence.i
+  val flushBTB = WireInit(false.B)
+  val flushTLB = WireInit(false.B)
+  BoringUtils.addSink(flushBTB, "MOUFlushICache")
+  BoringUtils.addSink(flushTLB, "MOUFlushTLB")
+  Debug(reset.asBool || (flushBTB || flushTLB), "[BPU-RESET] bpu-reset flushBTB:%d flushTLB:%d\n", flushBTB, flushTLB)
 
-//   // ENDFORMAL
+  (0 to sets).map(i => {
+    branchTarget(i).reset := reset.asBool || (flushBTB || flushTLB)
+    branchTarget(i).io.r.req.valid := io.pc.valid
+    branchTarget(i).io.r.req.bits.setIdx := entryAddr.getIdx(io.pc.bits)
+  })
 
-//   // branch target buffer is just a SRAM. When a valid PC comes in, make a read
-//   // request from the buffer, trying to fetch a record with given address from
-//   // the incoming PC.
+  branchTarget.io.r.req.valid := io.in.pc.valid
+  branchTarget.io.r.req.bits.setIdx := entryAddr.getIdx(io.in.pc.bits)
 
-//   val mem = Module(new SyncMem(entryType, sets = sets))
+  (0 to sets).map( i => {
+    io.out(i) := branchTarget(i).io.r.resp.data(0)
+  })
+  // since there is one cycle latency to read SyncReadMem,
+  // we should latch the input pc for one cycle
+  val pcLatch = RegEnable(io.in.pc.bits, io.in.pc.valid)
+  val branchTargetHit = branchTargetRead.tag === entryAddr.getTag(pcLatch) && !flush && RegNext(branchTarget.io.r.req.ready, init = false.B)
 
-//   // After sending the result to io.out.entry, it would take a few cycles to get
-//   // the result of execution, telling if the branch prediction is correct. If not,
-//   // the corresponding entry in the buffer will be updated.
-//   //
-//   // The detail of fb found in Feedback.scala.
-
-//   val fb = io.in.feed
-//   val written = WireInit(0.U.asTypeOf(entryType))
-
-//   written.tag := addr.getTag(fb.pc)
-//   written.target := fb.pc
-//   written.branchType := fb.branchType
-
-//   mem.io.w.req.valid := fb.isMispred && fb.valid
-//   mem.io.w.req.bits.index := addr.getIdx(fb.pc)
-//   mem.io.w.req.bits.data := written
-
-//   // Read out the buffer entry from the SRAM.
-
-//   mem.io.r.req.valid := io.in.pc.valid
-//   mem.io.r.req.bits.index := addr.getIdx(io.in.pc.bits)
-
-//   // setup output place. The response data from SRAM will be stored here.
-
-//   io.out := mem.io.r.res.data(0)
-
-//   // ==========================================================================
-//   // FORMAL VERIFICATION
-
-//   val anyAddr = anyconst(log2Up(sets))
-//   val reqW = mem.io.w.req
-//   val reqR = mem.io.r.req
-
-//   // when incoming feedback is valid and missed, begin to update the buffer.
-//   when(fb.isMispred && fb.valid) {
-//     assert(reqW.valid)
-//   }
-//   // condition for writing
-//   val Seq(prevOnReset, prev2OnReset) = ShiftRegisters(mem.io.onReset, 2)
-
-//   val Seq(prevValidReqW, prev2ValidReqW) = ShiftRegisters(reqW.valid, 2) 
-//   val prev2AddrReqW = ShiftRegister(reqW.bits.index, 2)
-
-//   val Seq(prevReadyReqR, prev2ReadyReqR) = ShiftRegisters(reqR.ready, 2)
-//   val prevAddrReqR = RegNext(reqR.bits.index)
-
-//   // This is the condition when valid to write to memory:
-//   // 1. memory is not onReset
-//   // 2. incoming data is valid
-//   when(!prev2OnReset && prev2ValidReqW && prev2AddrReqW === anyAddr) {
-
-//     when(!mem.io.onReset && reqW.valid) {
-//       assert(reqR.ready)
-//     }
-
-//     // reading condition is specified within this when clause. No that both
-//     // reading and writing cause 1-cycle delay. Thus when we proceed to current
-//     // cycle, we may get the data that written 2 cycles ago.
-
-//     when(reqR.ready && prevReadyReqR && prevAddrReqR === anyAddr) {
-//       assert(written.asUInt() === io.out.asUInt())
-//     }
-
-//   }
-
-//   // when [not onReset] AND [read enabled] for BOTH last-of-last and last cycle. 
-//   when(prev2ReadyReqR && prevReadyReqR && reqR.ready) {
-
-//     // the read result of current cycle (requested at last cycle) should be identical
-//     // to it in last cycle (requested at last-of-last cycle)
-//     assert(io.out.asUInt() === RegNext(io.out).asUInt())
-//   }
-
-//   // store a copy of incoming PC. If the tag of incoming PC is equal to the read
-//   // one, then hit. It also need to meet the condition that we are not in flushing,
-//   // AND we are reading from the buffer. Otherwise it could be an occassional hit,
-//   // since the entry could be the previous read.
-  
-//   val prevPc = RegEnable(io.in.pc.bits, io.in.pc.valid)
-  
-//   io.hit := !flush && 
-//     io.out.tag === addr.getTag(prevPc) && 
-//     RegNext(mem.io.r.req.ready, init = false.B)
-
-
-// } 
-
-
+}

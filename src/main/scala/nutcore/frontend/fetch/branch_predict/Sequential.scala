@@ -69,13 +69,10 @@ class Sequential extends NutCoreModule {
   // val phtTaken = RegEnable(pht.read(btbAddr.getIdx(io.in.pc.bits))(1), io.in.pc.valid)
 
   // RAS
-
-  val NRras = 16
-  val ras = Mem(NRras, UInt(VAddrBits.W))
-  // val raBrIdxs = Mem(NRras, UInt(2.W))
-  val sp = Counter(NRras)
-  val rasTarget = RegEnable(ras.read(sp.value), io.in.pc.valid)
-  // val rasBrIdx = RegEnable(raBrIdxs.read(sp.value), io.in.pc.valid)
+  // val NRras = 16
+  // val ras = Mem(NRras, UInt(VAddrBits.W))
+  // val sp = Counter(NRras)
+  // val rasTarget = RegEnable(ras.read(sp.value), io.in.pc.valid)
 
   // update
   val req = WireInit(0.U.asTypeOf(new BranchPredictUpdateRequestPort))
@@ -91,6 +88,13 @@ class Sequential extends NutCoreModule {
     pc=io.in.pc,
     req=req
   )(0)
+
+  val rasTarget = ReturnAddressStack(
+    stackSize=NRras,
+    pc=io.in.pc,
+    req=req
+  )
+
 
   Debug(req.valid, "[BTBUP] pc=%x tag=%x index=%x bridx=%x tgt=%x type=%x\n", req.pc, btbAddr.getTag(req.pc), btbAddr.getIdx(req.pc), Cat(req.pc(1), ~req.pc(1)), req.actualTarget, req.btbType)
 

@@ -63,19 +63,26 @@ class Dynamic extends NutCoreModule {
   
   // RAS
   val NRras = 16
-  val ras = Mem(NRras, UInt(VAddrBits.W))
-  val sp = Counter(NRras)
-  val rasTarget = RegEnable(ras.read(sp.value), io.in.pc.valid)
+  // val ras = Mem(NRras, UInt(VAddrBits.W))
+  // val sp = Counter(NRras)
+  // val rasTarget = RegEnable(ras.read(sp.value), io.in.pc.valid)
 
   // update
   val req = WireInit(0.U.asTypeOf(new BranchPredictUpdateRequestPort))
   val btbWrite = WireInit(0.U.asTypeOf(btbEntry()))
   // BoringUtils.addSink(req, "bpuUpdateReq")
 
+  // Pattern History Table
   val phtTaken = PatternHistory(
     sets=4,
     entryNum=NRbtb, 
     addr=btbAddr,
+    pc=io.in.pc,
+    req=req
+  )
+
+  val rasTarget = ReturnAddressStack(
+    stackSize=NRras,
     pc=io.in.pc,
     req=req
   )
@@ -106,18 +113,18 @@ class Dynamic extends NutCoreModule {
   //     (0 to 3).map(i => when(i.U === reqLatch.pc(2,1)){pht(i).write(btbAddr.getIdx(reqLatch.pc), newCnt)})
   //   }
   // }
-  when (req.valid) {
-    when (req.fuOpType === ALUOpType.call)  {
-      ras.write(sp.value + 1.U, Mux(req.isRVC, req.pc + 2.U, req.pc + 4.U))
-      sp.value := sp.value + 1.U
-    }
-    .elsewhen (req.fuOpType === ALUOpType.ret) {
-      when(sp.value === 0.U) {
-        // RAS empty, do nothing
-      }
-      sp.value := Mux(sp.value===0.U, 0.U, sp.value - 1.U)
-    }
-  }
+  // when (req.valid) {
+  //   when (req.fuOpType === ALUOpType.call)  {
+  //     ras.write(sp.value + 1.U, Mux(req.isRVC, req.pc + 2.U, req.pc + 4.U))
+  //     sp.value := sp.value + 1.U
+  //   }
+  //   .elsewhen (req.fuOpType === ALUOpType.ret) {
+  //     when(sp.value === 0.U) {
+  //       // RAS empty, do nothing
+  //     }
+  //     sp.value := Mux(sp.value===0.U, 0.U, sp.value - 1.U)
+  //   }
+  // }
 
   def genInstValid(pc: UInt) = LookupTree(pc(2,1), List(
     "b00".U -> "b1111".U,

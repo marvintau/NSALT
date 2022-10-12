@@ -18,9 +18,11 @@ class Dummy extends NutCoreModule {
     val ignore = Input(Bool())
     val brIdx = Output(Vec(4, Bool()))
   })
+
   // Note: when io.ignore, io.out.valid must be false.B for this pc
   // This limitation is for cross instline inst fetch logic
-  io.valid := io.in.pc.valid // Predicter is returning a result
+  
+  io.valid := io.in.pc.valid // Predictor is returning a result
   io.out.valid := false.B // Need redirect
   io.out.target := DontCare // Redirect target
   io.out.rtype := DontCare // Predicter does not need to care about it 
