@@ -20,6 +20,8 @@ import chisel3._
 import chisel3.util._
 import chisel3.util.experimental.BoringUtils
 
+import nutcore.fetch.branch_predict._
+
 import utils._
 import difftest._
 import top.Settings
@@ -145,7 +147,7 @@ class ALU(hasBru: Boolean = false) extends NutCoreModule {
   io.in.ready := io.out.ready
   io.out.valid := valid
 
-  val bpuUpdateReq = WireInit(0.U.asTypeOf(new BPUUpdateReq))
+  val bpuUpdateReq = WireInit(0.U.asTypeOf(new BranchPredictUpdateRequestPort))
   bpuUpdateReq.valid := valid && isBru
   bpuUpdateReq.pc := io.cfIn.pc
   bpuUpdateReq.isMissPredict := predictWrong

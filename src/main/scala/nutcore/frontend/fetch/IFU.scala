@@ -20,6 +20,13 @@ import chisel3._
 import chisel3.util._
 import chisel3.util.experimental.BoringUtils
 
+import nutcore.fetch.branch_predict.{
+  Dynamic => BranchPredictDynamic,
+  Sequential => BranchPredictSequential,
+  Embedded => BranchPredictEmbedded,
+  Dummy => BranchPredictDummy
+}
+
 import utils._
 import bus.simplebus._
 import top.Settings
@@ -60,7 +67,7 @@ class IFU_ooo extends NutCoreModule with HasResetVector {
   // Note: we define instline as 8 Byte aligned data from icache 
 
   // Next-line branch predictor
-  val nlp = Module(new BPU_ooo)
+  val nlp = Module(new BranchPredictDynamic)
 
   // nlpxxx_latch is used for the situation when I$ is disabled
   val nlpvalidreg = RegInit(false.B)
@@ -145,7 +152,7 @@ class IFU_ooo extends NutCoreModule with HasResetVector {
 
   // Multi-cycle branch predictor
   // Multi-cycle branch predictor will not be synthesized if EnableMultiCyclePredictor is set to false
-  val mcp = Module(new DummyPredicter)
+  val mcp = Module(new BranchPredictDummy)
   mcp.io.in.pc.valid := io.imem.req.fire()
   mcp.io.in.pc.bits := pc
   mcp.io.flush := io.redirect.valid
@@ -271,7 +278,7 @@ class IFU_embedded extends NutCoreModule with HasResetVector {
   val pcUpdate = io.redirect.valid || io.imem.req.fire()
   val snpc = pc + 4.U  // sequential next pc
 
-  val bpu = Module(new BPU_embedded)
+  val bpu = Module(new BranchPredictEmbedded)
 
   // predicted next pc
   val pnpc = bpu.io.out.target
@@ -323,7 +330,7 @@ class IFU_inorder extends NutCoreModule with HasResetVector {
   val pcUpdate = io.redirect.valid || io.imem.req.fire()
   val snpc = Mux(pc(1), pc + 2.U, pc + 4.U)  // sequential next pc
 
-  val bp1 = Module(new BPU_inorder)
+  val bp1 = Module(new BranchPredictSequential)
 
   val crosslineJump = bp1.io.crosslineJump
   val crosslineJumpLatch = RegInit(false.B) 

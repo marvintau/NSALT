@@ -16,6 +16,8 @@
 
 package nutcore
 
+import nutcore.fetch.branch_predict._
+
 import chisel3._
 import chisel3.util._
 
@@ -98,16 +100,16 @@ object RV32I_BRUInstr extends HasInstrType {
   )
 
   val bruFuncTobtbTypeTable = List(
-    ALUOpType.beq  -> BTBtype.B,
-    ALUOpType.bne  -> BTBtype.B,
-    ALUOpType.blt  -> BTBtype.B,
-    ALUOpType.bge  -> BTBtype.B,
-    ALUOpType.bltu -> BTBtype.B,
-    ALUOpType.bgeu -> BTBtype.B,
-    ALUOpType.call -> BTBtype.J,
-    ALUOpType.ret  -> BTBtype.R,
-    ALUOpType.jal  -> BTBtype.J,
-    ALUOpType.jalr -> BTBtype.I
+    ALUOpType.beq  -> BranchType.B,
+    ALUOpType.bne  -> BranchType.B,
+    ALUOpType.blt  -> BranchType.B,
+    ALUOpType.bge  -> BranchType.B,
+    ALUOpType.bltu -> BranchType.B,
+    ALUOpType.bgeu -> BranchType.B,
+    ALUOpType.call -> BranchType.J,
+    ALUOpType.ret  -> BranchType.R,
+    ALUOpType.jal  -> BranchType.J,
+    ALUOpType.jalr -> BranchType.I
   )
 }
 
