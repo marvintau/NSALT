@@ -20,7 +20,7 @@ import chisel3._
 import chisel3.util._
 import chisel3.util.experimental.BoringUtils
 
-import nutcore.fetch.branch_predict._
+import nutcore.frontend.fetch.branch_predict._
 
 import utils._
 import difftest._
@@ -72,6 +72,8 @@ class ALUIO extends FunctionUnitIO {
   val cfIn = Flipped(new CtrlFlowIO)
   val redirect = new RedirectIO
   val offset = Input(UInt(XLEN.W))
+
+  val bpuUpdateReq = Output(new BranchPredictUpdateRequestPort())
 }
 
 class ALU(hasBru: Boolean = false) extends NutCoreModule {
@@ -157,8 +159,10 @@ class ALU(hasBru: Boolean = false) extends NutCoreModule {
   bpuUpdateReq.btbType := LookupTree(func, RV32I_BRUInstr.bruFuncTobtbTypeTable)
   bpuUpdateReq.isRVC := isRVC
 
+  io.bpuUpdateReq <> bpuUpdateReq
+
   if(hasBru){
-    BoringUtils.addSource(RegNext(bpuUpdateReq), "bpuUpdateReq")
+    // BoringUtils.addSource(RegNext(bpuUpdateReq), "bpuUpdateReq")
   
     val right = valid && isBru && !predictWrong
     val wrong = valid && isBru && predictWrong

@@ -33,6 +33,8 @@ class EXU(implicit val p: NutCoreConfig) extends NutCoreModule {
     val dmem = new SimpleBusUC(addrBits = VAddrBits)
     val forward = new ForwardIO
     val memMMU = Flipped(new MemMMUIO)
+
+    // val bpuUpdateReq = new BranchPredictUpdateRequestPort()
   })
 
   val src1 = io.in.bits.data.src1(XLEN-1,0)
@@ -48,6 +50,7 @@ class EXU(implicit val p: NutCoreConfig) extends NutCoreModule {
   alu.io.cfIn := io.in.bits.cf
   alu.io.offset := io.in.bits.data.imm
   alu.io.out.ready := true.B
+  // io.bpuUpdateReq := alu.io.bpuUpdateReq
 
   def isBru(func: UInt) = func(4)
 

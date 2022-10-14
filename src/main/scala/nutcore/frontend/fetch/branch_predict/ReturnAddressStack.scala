@@ -1,5 +1,5 @@
 
-package nutcore.fetch.branch_predict
+package nutcore.frontend.fetch.branch_predict
 
 import chisel3._
 import chisel3.util._
@@ -15,19 +15,19 @@ class ReturnAddressStack (val stackSize: Int) extends NutCoreModule {
 
     val pc = Flipped(Valid((UInt(32.W))))
 
-    val out = Output(Vec(sets, Bool()))
+    // val out = Output(Vec(sets, Bool()))
+    val out = Output(UInt(VAddrBits.W))
 
     // Originally connected via BoringUtil
-    val req = new BranchPredictUpdateRequestPort()
+    val req = Flipped(new BranchPredictUpdateRequestPort())
   })
 
-  val stackSize = 16
   val stack = Mem(stackSize, UInt(VAddrBits.W))
   val sp = Counter(stackSize)
 
   when (io.req.valid) {
     when (io.req.fuOpType === ALUOpType.call)  {
-      stack.write(sp.value + 1.U, Mux(io.req.isRVC, req.pc + 2.U, io.req.pc + 4.U))
+      stack.write(sp.value + 1.U, Mux(io.req.isRVC, io.req.pc + 2.U, io.req.pc + 4.U))
       sp.value := sp.value + 1.U
     }
     .elsewhen (io.req.fuOpType === ALUOpType.ret) {

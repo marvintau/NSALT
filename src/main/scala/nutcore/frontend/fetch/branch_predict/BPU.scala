@@ -14,7 +14,7 @@
 * See the Mulan PSL v2 for more details.  
 ***************************************************************************************/
 
-package nutcore.fetch.branch_predict
+package nutcore.frontend.fetch.branch_predict
 
 import chisel3._
 import chisel3.util._

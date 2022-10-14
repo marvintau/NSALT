@@ -1,5 +1,5 @@
 
-package nutcore.fetch.branch_predict
+package nutcore.frontend.fetch.branch_predict
 
 import chisel3._
 import chisel3.util._
@@ -18,7 +18,7 @@ class PatternHistory(val sets: Int, val entryNum: Int, val addr: EntryAddr) exte
     val out = Output(Vec(sets, Bool()))
 
     // Originally connected via BoringUtil
-    val req = new BranchPredictUpdateRequestPort()
+    val req = Flipped(new BranchPredictUpdateRequestPort())
   })
 
   // 2 for first two bits of branch target buffer count

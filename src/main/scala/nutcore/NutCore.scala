@@ -20,6 +20,12 @@ import chisel3._
 import chisel3.util._
 import chisel3.util.experimental.BoringUtils
 
+import nutcore.frontend.{
+  Dynamic => FrontEndDynamic,
+  Sequential => FrontEndSequential,
+  Embedded => FrontEndEmbedded,
+}
+
 import bus.simplebus._
 import bus.axi4._
 import utils._
@@ -98,9 +104,9 @@ class NutCore(implicit val p: NutCoreConfig) extends NutCoreModule {
 
   // Frontend
   val frontend = (Settings.get("IsRV32"), Settings.get("EnableOutOfOrderExec")) match {
-    case (true, _)      => Module(new Frontend_embedded)
-    case (false, true)  => Module(new Frontend_ooo)
-    case (false, false) => Module(new Frontend_inorder)
+    case (true, _)      => Module(new FrontEndEmbedded)
+    case (false, true)  => Module(new FrontEndDynamic)
+    case (false, false) => Module(new FrontEndSequential)
   }
   
   // Backend

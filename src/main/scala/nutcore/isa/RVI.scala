@@ -16,7 +16,7 @@
 
 package nutcore
 
-import nutcore.fetch.branch_predict._
+import nutcore.frontend.fetch.branch_predict._
 
 import chisel3._
 import chisel3.util._
