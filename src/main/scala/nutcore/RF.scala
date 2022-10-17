@@ -26,6 +26,9 @@ trait HasRegFileParameter {
   val NRReg = 32
 }
 
+// Register File here is talking about the physical implementation of
+// CPU registers. Not to be confused with register in EE concepts.
+
 class RegFile extends HasRegFileParameter with HasNutCoreParameter {
   val rf = Mem(NRReg, UInt(XLEN.W))
   def read(addr: UInt) : UInt = Mux(addr === 0.U, 0.U, rf(addr))

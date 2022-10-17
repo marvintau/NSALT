@@ -20,6 +20,9 @@ import chisel3._
 import chisel3.util._
 import chisel3.util.experimental.BoringUtils
 
+import nutcore.mem.tlb._
+import nutcore.mem.cache._
+
 import nutcore.frontend.{
   Dynamic => FrontEndDynamic,
   Sequential => FrontEndSequential,
@@ -142,9 +145,9 @@ class NutCore(implicit val p: NutCoreConfig) extends NutCoreModule {
     }
 
     // Make DMA access through L1 DCache to keep coherence
-    val expender = Module(new SimpleBusUCExpender(userBits = DCacheUserBundleWidth, userVal = 0.U))
-    expender.io.in <> io.frontend
-    dmemXbar.io.in(0) <> expender.io.out
+    val extender = Module(new SimpleBusUCExtender(userBits = DCacheUserBundleWidth, userVal = 0.U))
+    extender.io.in <> io.frontend
+    dmemXbar.io.in(0) <> extender.io.out
 
     io.mmio <> mmioXbar.io.out
 

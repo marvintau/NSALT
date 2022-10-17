@@ -58,3 +58,12 @@ space when testing.
    proper name space can effectively reduce the length of naming. For
    example, all names regarding `SimpleBus` can be put under the name
    space of `SimpleBus`.
+
+
+## 3. Refactoring tasks
+
+1. Split code w.r.t. different cores into separate files.
+
+2. Remove all `sealed` keywords for further code splitting.
+
+3. Change `BoringUtils` into normal port definition with `IO` and `Bundle`

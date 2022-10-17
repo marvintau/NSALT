@@ -24,7 +24,7 @@ import utils._
 import bus.axi4._
 import bus.memport._
 
-sealed abstract class SimpleBusBundle extends Bundle with HasNutCoreParameter
+abstract class SimpleBusBundle extends Bundle with HasNutCoreParameter
 
 object SimpleBusCmd {
   // req
@@ -60,7 +60,7 @@ class SimpleBusReqBundle(val userBits: Int = 0, val addrBits: Int = 32, val idBi
     p"wmask = 0x${Hexadecimal(wmask)}, wdata = 0x${Hexadecimal(wdata)}"
   }
 
-  def apply(addr: UInt, cmd: UInt, size: UInt, wdata: UInt, wmask: UInt, user: UInt = 0.U, id: UInt = 0.U) {
+  def apply(addr: UInt, cmd: UInt, size: UInt, wdata: UInt, wmask: UInt, user: UInt = 0.U, id: UInt = 0.U) = {
     this.addr := addr
     this.cmd := cmd
     this.size := size
@@ -112,7 +112,7 @@ class SimpleBusUC(val userBits: Int = 0, val addrBits: Int = 32, val idBits: Int
   }
 }
 
-class SimpleBusUCExpender(val userBits: Int, val userVal: UInt, val addrBits: Int = 32, idBits: Int = 0) extends Module {
+class SimpleBusUCExtender(val userBits: Int, val userVal: UInt, val addrBits: Int = 32, idBits: Int = 0) extends Module {
   val io = IO(new Bundle{
     val in = Flipped(new SimpleBusUC())
     val out = new SimpleBusUC(userBits = userBits, idBits = idBits)
