@@ -33,7 +33,7 @@ trait HasIBUFConst{
 class IBF extends NutCoreModule with HasInstrType with HasIBUFConst{
   val io = IO(new Bundle {
     val in = Flipped(Decoupled(new InstFetchIO))
-    val out = Vec(2, Decoupled(new CtrlFlowIO))
+    val out = Vec(2, Decoupled(new InstrStreamPort))
     val flush = Input(Bool())
   })
 

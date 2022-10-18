@@ -24,6 +24,32 @@ class StageCheckIO(implicit val cacheConfig: CacheConfig) extends CacheBundle {
   val forwardData = Output(CacheDataArrayWriteBus().req.bits)
 }
 
+// Stale-Update-Revalidate
+// ========================
+// a common pattern that:
+// - if there is incoming signal with valid (write enable), then forward
+//   incoming signal as output, MEANWHILE store in a RegEnable, and
+// - if incoming signal is not valid, then return the previously stored
+//   result.
+// 
+// similar to BoolStopWatch
+
+object SUR{
+  def apply[T <:Data](validate: Bool, invalidate: Bool, incoming: T) = {
+    
+    val switch = RegInit(false.B)
+    when (validate) {
+      switch := true.B
+    }
+    when (invalidate) {
+      switch := false.B
+    }
+    val stored = RegEnable(incoming, validate)
+
+    (switch || validate, Mux(switch, incoming, stored))
+  }
+
+} 
 // check
 class CacheStageCheck(implicit val cacheConfig: CacheConfig) extends CacheModule {
 
@@ -39,25 +65,43 @@ class CacheStageCheck(implicit val cacheConfig: CacheConfig) extends CacheModule
   val req = io.in.bits.req
   val addr = req.addr.asTypeOf(addrBundle)
 
-  val isMetaForwarding = io.in.valid && 
-    io.metaWriteBus.req.valid && 
-    io.metaWriteBus.req.bits.setIdx === getMetaIdx(req.addr)
-  val isMetaForwarded = RegInit(false.B)
-  when (isMetaForwarding) {
-    isMetaForwarded := true.B
-  }
-  when (io.in.fire() || !io.in.valid) {
-    isMetaForwarded := false.B 
-  }
+  // Forwarded Meta Information of a Cache Line
+  // ------------------------------------------
+  // All the following code in the segment is to get a `metaForwarded`
+  // which uses either "fresh" incoming meta info or stored previously
 
-  val metaForwarded = RegEnable(io.metaWriteBus.req.bits, isMetaForwarding)
+  // val isMetaForwarding = io.in.valid && 
+  //   io.metaWriteBus.req.valid && 
+  //   io.metaWriteBus.req.bits.setIdx === getMetaIdx(req.addr)
+
+  // val isMetaForwarded = RegInit(false.B)
+
+  // when (isMetaForwarding) {
+  //   isMetaForwarded := true.B
+  // }
+  // when (io.in.fire() || !io.in.valid) {
+  //   isMetaForwarded := false.B 
+  // }
+
+  // val metaForwarded = RegEnable(io.metaWriteBus.req.bits, isMetaForwarding)
+  // val metaForwarded = Mux(isMetaForwarding, io.metaWriteBus.req.bits, metaForwarded)
+
+  val (isMetaForwarding, metaForwarded) = SUR(
+    io.in.valid && 
+    io.metaWriteBus.req.valid && 
+    io.metaWriteBus.req.bits.setIdx === getMetaIdx(req.addr),
+    io.in.fire() || !io.in.valid,
+    io.metaWriteBus.req.bits 
+  )
+
+  // ------------------------------------------
+
   val metaWay = Wire(Vec(Ways, chiselTypeOf(metaForwarded.data)))
 
-  val forwardMeta = Mux(isMetaForwarding, io.metaWriteBus.req.bits, metaForwarded)
 
-  val forwardWaymask = forwardMeta.waymask.getOrElse("1".U).asBools
+  val forwardWaymask = metaForwarded.waymask.getOrElse("1".U).asBools
   forwardWaymask.zipWithIndex.map { case (w, i) =>
-    metaWay(i) := Mux((isMetaForwarding || isMetaForwarding) && w, forwardMeta.data, io.metaReadResp(i))
+    metaWay(i) := Mux(isMetaForwarding && w, metaForwarded.data, io.metaReadResp(i))
   }
 
   val hitVec = VecInit(metaWay.map(m => m.valid && (m.tag === addr.tag) && io.in.valid)).asUInt
@@ -75,9 +119,11 @@ class CacheStageCheck(implicit val cacheConfig: CacheConfig) extends CacheModule
   //   metaWay.map(m => Debug("[ERROR] metaWay %x metat %x reqt %x\n", m.valid, m.tag, addr.tag))
   //   io.metaReadResp.map(m => Debug("[ERROR] metaReadResp %x metat %x reqt %x\n", m.valid, m.tag, addr.tag))
   //   Debug("[ERROR] metaForwarded isMetaForwarding %x %x metat %x wm %b\n", isMetaForwarding, metaForwarded.data.valid, metaForwarded.data.tag, metaForwarded.waymask.get)
-  //   Debug("[ERROR] forwardMeta isMetaForwarding %x %x metat %x wm %b\n", isMetaForwarding, io.metaWriteBus.req.bits.data.valid, io.metaWriteBus.req.bits.data.tag, io.metaWriteBus.req.bits.waymask.get)
+  //   Debug("[ERROR] metaForwarded isMetaForwarding %x %x metat %x wm %b\n", isMetaForwarding, io.metaWriteBus.req.bits.data.valid, io.metaWriteBus.req.bits.data.tag, io.metaWriteBus.req.bits.waymask.get)
   // }
-  when(PopCount(waymask) > 1.U){Debug("[ERROR] hit %b wmask %b hitvec %b\n", io.out.bits.hit, forwardMeta.waymask.getOrElse("1".U), hitVec)}
+  when(PopCount(waymask) > 1.U){
+    Debug("[ERROR] hit %b wmask %b hitvec %b\n", io.out.bits.hit, metaForwarded.waymask.getOrElse("1".U), hitVec)
+  }
   assert(!(io.in.valid && PopCount(waymask) > 1.U))
 
   io.out.bits.metas := metaWay
@@ -86,21 +132,29 @@ class CacheStageCheck(implicit val cacheConfig: CacheConfig) extends CacheModule
   io.out.bits.datas := io.dataReadResp
   io.out.bits.mmio := AddressSpace.isMMIO(req.addr)
 
-  val isForwardData = io.in.valid && (io.dataWriteBus.req match { case r =>
-    r.valid && r.bits.setIdx === getDataIdx(req.addr)
-  })
-  val isForwardDataReg = RegInit(false.B)
-  when (isForwardData) { isForwardDataReg := true.B }
-  when (io.in.fire() || !io.in.valid) { isForwardDataReg := false.B }
-  val forwardDataReg = RegEnable(io.dataWriteBus.req.bits, isForwardData)
-  io.out.bits.isForwardData := isForwardDataReg || isForwardData
-  io.out.bits.forwardData := Mux(isForwardData, io.dataWriteBus.req.bits, forwardDataReg)
+  // val isDataForwarding = io.in.valid && (io.dataWriteBus.req match { case r =>
+  //     r.valid && r.bits.setIdx === getDataIdx(req.addr)
+  //   })
+  // val isForwardDataReg = RegInit(false.B)
+  // when (isDataForwarding) { isForwardDataReg := true.B }
+  // when (io.in.fire() || !io.in.valid) { isForwardDataReg := false.B }
+  // val forwardDataReg = RegEnable(io.dataWriteBus.req.bits, isDataForwarding)
+  
+  val (isDataForwarding, dataForwarded) = SUR(
+    io.in.valid && (io.dataWriteBus.req match { case r =>
+      r.valid && r.bits.setIdx === getDataIdx(req.addr)
+    }),
+    io.in.fire() | !io.in.valid,
+    io.dataWriteBus.req.bits
+  )
+  io.out.bits.isForwardData := isDataForwarding
+  io.out.bits.forwardData := dataForwarded
 
   io.out.bits.req <> req
   io.out.valid := io.in.valid
   io.in.ready := !io.in.valid || io.out.fire()
 
-  Debug("[isFD:%d isFDreg:%d inFire:%d invalid:%d \n", isForwardData, isForwardDataReg, io.in.fire(), io.in.valid)
-  Debug("[isFM:%d isFMreg:%d metawreq:%x widx:%x ridx:%x \n", isMetaForwarding, isMetaForwarding, io.metaWriteBus.req.valid, io.metaWriteBus.req.bits.setIdx, getMetaIdx(req.addr))
+  // Debug("[isFD:%d isFDreg:%d inFire:%d invalid:%d \n", dataForwarded, isDataForwarding, io.in.fire(), io.in.valid)
+  // Debug("[isFM:%d isFMreg:%d metawreq:%x widx:%x ridx:%x \n", isMetaForwarding, isMetaForwarding, io.metaWriteBus.req.valid, io.metaWriteBus.req.bits.setIdx, getMetaIdx(req.addr))
 }
 

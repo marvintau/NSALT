@@ -3,7 +3,7 @@
 package nutcore.frontend
 import nutcore._
 
-import nutcore.fetch.{
+import nutcore.frontend.fetch.{
   Dynamic => FetchDynamic,
 }
 
@@ -27,7 +27,7 @@ class Dynamic(implicit val p: NutCoreConfig) extends NutCoreModule with HasFront
   val idu  = Module(new IDU)
 
   pipelineConnect2(ifu.io.out, ibf.io.in, ifu.io.flushVec(0))
-  PipelineVector2Connect(new CtrlFlowIO, ibf.io.out(0), ibf.io.out(1), idu.io.in(0), idu.io.in(1), ifu.io.flushVec(1), if (EnableOutOfOrderExec) 8 else 4)
+  PipelineVector2Connect(new InstrStreamPort, ibf.io.out(0), ibf.io.out(1), idu.io.in(0), idu.io.in(1), ifu.io.flushVec(1), if (EnableOutOfOrderExec) 8 else 4)
   ibf.io.flush := ifu.io.flushVec(1)
 
   io.out <> idu.io.out

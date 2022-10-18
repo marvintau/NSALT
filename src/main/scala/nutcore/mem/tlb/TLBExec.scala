@@ -59,6 +59,7 @@ class TLBExec(implicit val tlbConfig: TLBConfig) extends TlbModule{
   val hitData = Mux1H(waymask, md).asTypeOf(tlbBundle2).data.asTypeOf(dataBundle)
   val hitFlag = hitMeta.flag.asTypeOf(flagBundle)
   val hitMask = hitMeta.mask
+  
   // hit write back pte.flag
   val hitinstrPF = WireInit(false.B)
   val hitWB = hit && (!hitFlag.a || !hitFlag.d && req.isWrite()) && !hitinstrPF && !(loadPF || storePF || io.pf.isPF())

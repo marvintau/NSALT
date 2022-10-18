@@ -14,7 +14,7 @@
 * See the Mulan PSL v2 for more details.  
 ***************************************************************************************/
 
-package nutcore
+package nutcore.backend
 
 import chisel3._
 import chisel3.util._
@@ -22,6 +22,8 @@ import chisel3.util.experimental.BoringUtils
 
 import utils._
 import difftest._
+
+import nutcore._
 
 object physicalRFTools{
   def getPRFAddr(robIndex: UInt, bank: UInt): UInt = {
@@ -50,7 +52,7 @@ class ROB(implicit val p: NutCoreConfig) extends NutCoreModule with HasInstrType
     val scommit = Output(Bool())
 
     // PRF
-    val aprf = Output(Vec(robWidth * 2, UInt(prfAddrWidth.W))) // prf addr for current enqueue inst
+    val aprf = Output(Vec(robWidth * 2, UInt(physRegFileAddrWidth.W))) // prf addr for current enqueue inst
     val rprf = Output(Vec(robWidth * 2, UInt(XLEN.W))) // prf value data for current enqueue inst
     val rvalid = Output(Vec(robWidth * 2, Bool()))
     val rcommited = Output(Vec(robWidth * 2, Bool()))
@@ -107,11 +109,11 @@ class ROB(implicit val p: NutCoreConfig) extends NutCoreModule with HasInstrType
   io.empty := ringBufferEmpty
 
   // Register Map  
-  val rmtMap = Reg(Vec(NRReg, UInt(prfAddrWidth.W)))
+  val rmtMap = Reg(Vec(NRReg, UInt(physRegFileAddrWidth.W)))
   val rmtValid = RegInit(VecInit(Seq.fill(NRReg)(false.B)))
 
   class Checkpoint extends NutCoreBundle {
-    val map = Vec(NRReg, UInt(prfAddrWidth.W))
+    val map = Vec(NRReg, UInt(physRegFileAddrWidth.W))
     val valid = Vec(NRReg, Bool())
   }
 
@@ -425,7 +427,7 @@ class ROB(implicit val p: NutCoreConfig) extends NutCoreModule with HasInstrType
 
   // reset headptr when mis-prediction recovery is triggered
   when(io.mispredictRec.valid && io.mispredictRec.redirect.valid){
-    ringBufferHead := io.mispredictRec.prfidx(prfAddrWidth-1, 1) + 1.U
+    ringBufferHead := io.mispredictRec.prfidx(physRegFileAddrWidth - 1, 1) + 1.U
   }
 
   // flush control

@@ -69,7 +69,7 @@ object ALUOpType {
 }
 
 class ALUIO extends FunctionUnitIO {
-  val cfIn = Flipped(new CtrlFlowIO)
+  val cfIn = Flipped(new InstrStreamPort)
   val redirect = new RedirectIO
   val offset = Input(UInt(XLEN.W))
 

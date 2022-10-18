@@ -18,7 +18,7 @@ import difftest._
 class Embedded extends NutCoreModule with HasResetVector {
   val io = IO(new Bundle {
     val imem = new SimpleBusUC(userBits = 64, addrBits = VAddrBits)
-    val out = Decoupled(new CtrlFlowIO)
+    val out = Decoupled(new InstrStreamPort)
     val redirect = Flipped(new RedirectIO)
     val flushVec = Output(UInt(4.W))
     val bpFlush = Output(Bool())

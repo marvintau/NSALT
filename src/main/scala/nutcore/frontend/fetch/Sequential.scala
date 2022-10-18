@@ -18,7 +18,7 @@ class Sequential extends NutCoreModule with HasResetVector {
   val io = IO(new Bundle {
 
     val imem = new SimpleBusUC(userBits = VAddrBits*2 + 4, addrBits = VAddrBits)
-    val out = Decoupled(new CtrlFlowIO)
+    val out = Decoupled(new InstrStreamPort)
 
     val redirect = Flipped(new RedirectIO)
     val flushVec = Output(UInt(4.W))

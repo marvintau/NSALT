@@ -112,7 +112,7 @@ class LSUIO extends FunctionUnitIO {
 
 class StoreQueueEntry extends NutCoreBundle{
   val pc       = UInt(VAddrBits.W)
-  val prfidx   = UInt(prfAddrWidth.W) // for debug
+  val prfidx   = UInt(physRegFileAddrWidth.W) // for debug
   val brMask   = UInt(checkpointSize.W)
   val wmask    = UInt((XLEN/8).W) // for store queue forwarding
   val vaddr    = UInt(VAddrBits.W)
@@ -128,7 +128,7 @@ class StoreQueueEntry extends NutCoreBundle{
 class moqEntry extends NutCoreBundle{
   val pc       = UInt(VAddrBits.W)
   val isRVC    = Bool()
-  val prfidx   = UInt(prfAddrWidth.W)
+  val prfidx   = UInt(physRegFileAddrWidth.W)
   val brMask   = UInt(checkpointSize.W)
   val stMask   = UInt(robSize.W)
   val vaddr    = UInt(VAddrBits.W) // for debug
@@ -765,7 +765,7 @@ class LSU extends NutCoreModule with HasLSUConst {
   val ldDataMask = Reg(Vec(robSize, UInt((PAddrBits-3).W)))
   val ldStmask = Reg(Vec(robSize, UInt(robSize.W)))
   val reqPrfidx = moq(loadDMemReqSrcPick).prfidx
-  val reqRobidx = reqPrfidx(prfAddrWidth-1, 1)
+  val reqRobidx = reqPrfidx(physRegFileAddrWidth-1, 1)
   when(io.robAllocate.valid){
     ldStmask(io.robAllocate.bits) := 0.U
   }
@@ -779,7 +779,7 @@ class LSU extends NutCoreModule with HasLSUConst {
   val storeNeedRollback = (0 until robSize).map(i =>{
     ldAddr(i) === Mux(havePendingStqEnq, moq(moqDmemPtr).paddr(PAddrBits-1, 3), io.dtlb.resp.bits.rdata(PAddrBits-1, 3)) &&
     (ldDataMask(i) & genWmask(moq(storeQueueEnqSrcPick).vaddr, moq(moqDmemPtr).size)).orR &&
-    ldStmask(i)(moq(storeQueueEnqSrcPick).prfidx(prfAddrWidth-1,1)) &&
+    ldStmask(i)(moq(storeQueueEnqSrcPick).prfidx(physRegFileAddrWidth-1,1)) &&
     robLoadInstVec(i)
   }).reduce(_ || _)
   when(storeQueueEnqueue && storeNeedRollback){
@@ -787,7 +787,7 @@ class LSU extends NutCoreModule with HasLSUConst {
     // printf("%d: Rollback detected at pc %x vaddr %x\n", GTimer(), moq(storeQueueEnqSrcPick).pc, moq(storeQueueEnqSrcPick).vaddr)
   }
   
-  // Debug(storeQueueEnqueue, "store backward pc %x lvec %b rob %x addrtag %x\n",moq(storeQueueEnqSrcPick).pc, robLoadInstVec, moq(storeQueueEnqSrcPick).prfidx(prfAddrWidth-1,1), Mux(havePendingStqEnq, moq(moqDmemPtr).paddr(PAddrBits-1, 3), io.dtlb.resp.bits.rdata(PAddrBits-1, 3)))
+  // Debug(storeQueueEnqueue, "store backward pc %x lvec %b rob %x addrtag %x\n",moq(storeQueueEnqSrcPick).pc, robLoadInstVec, moq(storeQueueEnqSrcPick).prfidx(physRegFileAddrWidth-1,1), Mux(havePendingStqEnq, moq(moqDmemPtr).paddr(PAddrBits-1, 3), io.dtlb.resp.bits.rdata(PAddrBits-1, 3)))
   // (0 until robSize).map(i =>Debug(storeQueueEnqueue, "%x %x %x "+i+"\n",ldAddr(i),ldStmask(i),robLoadInstVec(i)))
   
   // write back to load queue

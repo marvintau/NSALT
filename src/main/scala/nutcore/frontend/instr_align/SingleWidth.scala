@@ -25,8 +25,8 @@ import utils._
 // 1-width Naive Instruction Align Buffer
 class NaiveRVCAlignBuffer extends NutCoreModule with HasInstrType with HasExceptionNO {
   val io = IO(new Bundle {
-    val in = Flipped(Decoupled(new CtrlFlowIO))
-    val out = Decoupled(new CtrlFlowIO)
+    val in = Flipped(Decoupled(new InstrStreamPort))
+    val out = Decoupled(new InstrStreamPort)
     val flush = Input(Bool())
   })
 

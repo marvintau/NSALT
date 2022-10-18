@@ -19,6 +19,8 @@ package nutcore
 import chisel3._
 import chisel3.util._
 
+import nutcore.backend._
+
 class CtrlSignalIO extends NutCoreBundle {
   val src1Type = Output(SrcType())
   val src2Type = Output(SrcType())
@@ -51,10 +53,10 @@ class MisPredictionRecIO extends NutCoreBundle {
   val redirect = new RedirectIO
   val valid = Output(Bool())
   val checkpoint = Output(UInt(brTagWidth.W))
-  val prfidx = Output(UInt(prfAddrWidth.W))
+  val prfidx = Output(UInt(physRegFileAddrWidth.W))
 }
 
-class CtrlFlowIO extends NutCoreBundle {
+class InstrStreamPort extends NutCoreBundle {
   val instr = Output(UInt(64.W))
   val pc = Output(UInt(VAddrBits.W))
   val pnpc = Output(UInt(VAddrBits.W))
@@ -69,7 +71,7 @@ class CtrlFlowIO extends NutCoreBundle {
 }
 
 class DecodeIO extends NutCoreBundle {
-  val cf = new CtrlFlowIO
+  val cf = new InstrStreamPort
   val ctrl = new CtrlSignalIO
   val data = new DataSrcIO
 }
@@ -92,7 +94,7 @@ class OOCommitIO extends NutCoreBundle with HasBackendConst{
   val isMMIO = Output(Bool())
   val intrNO = Output(UInt(XLEN.W))
   val commits = Output(UInt(XLEN.W))
-  val prfidx = Output(UInt(prfAddrWidth.W)) //also as robidx
+  val prfidx = Output(UInt(physRegFileAddrWidth.W)) //also as robidx
   val exception = Output(Bool())
   val store = Output(Bool())
   val brMask = Output(UInt(checkpointSize.W))
@@ -165,9 +167,9 @@ class InstFetchIO extends NutCoreBundle {
 // Micro OP
 class RenamedDecodeIO extends NutCoreBundle with HasBackendConst {
   val decode = new DecodeIO
-  val prfDest = Output(UInt(prfAddrWidth.W))
-  val prfSrc1 = Output(UInt(prfAddrWidth.W))
-  val prfSrc2 = Output(UInt(prfAddrWidth.W))
+  val prfDest = Output(UInt(physRegFileAddrWidth.W))
+  val prfSrc1 = Output(UInt(physRegFileAddrWidth.W))
+  val prfSrc2 = Output(UInt(physRegFileAddrWidth.W))
   val src1Rdy = Output(Bool())
   val src2Rdy = Output(Bool())
   val brMask = Output(UInt(checkpointSize.W))

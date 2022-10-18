@@ -4,7 +4,7 @@
 package nutcore.frontend
 import nutcore._
 
-import nutcore.fetch.{
+import nutcore.frontend.fetch.{
   Embedded => FetchEmbedded,
 }
 

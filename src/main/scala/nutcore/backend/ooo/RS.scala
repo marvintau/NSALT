@@ -14,13 +14,15 @@
 * See the Mulan PSL v2 for more details.  
 ***************************************************************************************/
 
-package nutcore
+package nutcore.backend
 
 import chisel3._
 import chisel3.util._
 import chisel3.util.experimental.BoringUtils
 
 import utils._
+
+import nutcore._
 
 trait HasRSConst{
   // val rsSize = 4
@@ -29,6 +31,7 @@ trait HasRSConst{
 
 // Reservation Station for Out Of Order Execution Backend
 class RS(size: Int = 2, pipelined: Boolean = true, fifo: Boolean = false, priority: Boolean = false, checkpoint: Boolean = false, storeBarrier: Boolean = false, storeSeq: Boolean = false, name: String = "unnamedRS") extends NutCoreModule with HasRSConst with HasBackendConst {
+  
   val io = IO(new Bundle {
     val in = Flipped(Decoupled(new RenamedDecodeIO))
     val out = Decoupled(new RenamedDecodeIO)
@@ -46,12 +49,14 @@ class RS(size: Int = 2, pipelined: Boolean = true, fifo: Boolean = false, priori
   val rsSize = size
   val decode  = Mem(rsSize, new RenamedDecodeIO) // TODO: decouple DataSrcIO from DecodeIO
   // val decode  = Reg(Vec(rsSize, new RenamedDecodeIO)) // TODO: decouple DataSrcIO from DecodeIO
+
+  // Consider changing separate vec-regs into a vec-reg of bundle, as all indicates a RS entry
   val valid   = RegInit(VecInit(Seq.fill(rsSize)(false.B)))
   val src1Rdy = RegInit(VecInit(Seq.fill(rsSize)(false.B)))
   val src2Rdy = RegInit(VecInit(Seq.fill(rsSize)(false.B)))
   val brMask  = RegInit(VecInit(Seq.fill(rsSize)(0.U(checkpointSize.W))))
-  val prfSrc1 = Reg(Vec(rsSize, UInt(prfAddrWidth.W)))
-  val prfSrc2 = Reg(Vec(rsSize, UInt(prfAddrWidth.W)))
+  val prfSrc1 = Reg(Vec(rsSize, UInt(physRegFileAddrWidth.W)))
+  val prfSrc2 = Reg(Vec(rsSize, UInt(physRegFileAddrWidth.W)))
   val src1    = Reg(Vec(rsSize, UInt(XLEN.W)))
   val src2    = Reg(Vec(rsSize, UInt(XLEN.W)))
 
@@ -61,6 +66,7 @@ class RS(size: Int = 2, pipelined: Boolean = true, fifo: Boolean = false, priori
   val rsFull = valid.asUInt.andR
   val rsAllowin = !rsFull
   val rsReadygo = Wire(Bool())
+
   rsReadygo := instRdy.foldRight(false.B)((sum, i) => sum|i)
 
   val priorityMask = RegInit(VecInit(Seq.fill(rsSize)(VecInit(Seq.fill(rsSize)(false.B)))))
@@ -78,26 +84,28 @@ class RS(size: Int = 2, pipelined: Boolean = true, fifo: Boolean = false, priori
   // Here we listen to commit signal chosen by ROB?
   // If prf === src, mark it as `ready`
 
-  List.tabulate(rsSize)(i => 
-    when(valid(i)){
-      List.tabulate(rsCommitWidth)(j =>
-        when(!src1Rdy(i) && prfSrc1(i) === io.cdb(j).bits.prfidx && io.cdb(j).valid){
-            src1Rdy(i) := true.B
-            src1(i) := io.cdb(j).bits.commits
-        }
-      )
-      List.tabulate(rsCommitWidth)(j =>
-        when(!src2Rdy(i) && prfSrc2(i) === io.cdb(j).bits.prfidx && io.cdb(j).valid){
-            src2Rdy(i) := true.B
-            src2(i) := io.cdb(j).bits.commits
-        }
-      )
-      // Update RS according to brMask
-      // If a branch inst is canceled by BRU, the following insts with subject to this branch should also be canceled
-      brMask(i) := updateBrMask(brMask(i))
-      when(needMispredictionRecovery(brMask(i))){ valid(i):= false.B }
+  (0 to rsSize - 1).map( entry => when(valid(entry)){
+
+    (0 to rsCommitWidth - 1).map(line => when(io.cdb(line).valid) {
+    
+      when(!src1Rdy(entry) && prfSrc1(entry) === io.cdb(line).bits.prfidx){
+        src1Rdy(entry) := true.B
+        src1(entry) := io.cdb(line).bits.commits
+      }
+
+      when(!src2Rdy(entry) && prfSrc2(entry) === io.cdb(line).bits.prfidx){
+        src2Rdy(entry) := true.B
+        src2(entry) := io.cdb(line).bits.commits
+      }
+
+    }) 
+
+    // If a branch is mispredicted, all affected instructions are withdrawed.
+    brMask(entry) := updateBrMask(brMask(entry))
+    when(needMispredictionRecovery(brMask(entry))){ 
+      valid(entry):= false.B
     }
-  )
+  })
 
   // RS enqueue
   io.in.ready := rsAllowin
@@ -151,19 +159,24 @@ class RS(size: Int = 2, pipelined: Boolean = true, fifo: Boolean = false, priori
   // fix unpipelined 
   // when `pipelined` === false, RS helps unpipelined FU to store its uop for commit
   // if an unpipelined fu can store uop itself, set `pipelined` to true (it behaves just like a pipelined FU)
+
+
+
   if(!pipelined){
+
     val fuValidReg = RegInit(false.B)
     val brMaskPReg = RegInit(0.U(checkpointSize.W))
     val fuFlushReg = RegInit(false.B)
     val fuDecodeReg = RegEnable(io.out.bits, io.out.fire())
+    
     brMaskPReg := updateBrMask(brMaskPReg)
     when(io.out.fire()){ 
       fuValidReg := true.B 
       brMaskPReg := updateBrMask(brMask(dequeueSelect))
     }
     when(io.commit.get){ fuValidReg := false.B }
-    when((io.flush || needMispredictionRecovery(brMaskPReg)) && fuValidReg || (io.flush || needMispredictionRecovery(brMask(dequeueSelect))) && io.out.fire()){ fuFlushReg := true.B }
     when(io.commit.get){ fuFlushReg := false.B }
+    when((io.flush || needMispredictionRecovery(brMaskPReg)) && fuValidReg || (io.flush || needMispredictionRecovery(brMask(dequeueSelect))) && io.out.fire()){ fuFlushReg := true.B }
     when(fuValidReg){ io.out.bits := fuDecodeReg }
     when(fuValidReg){ io.out.valid := true.B && !fuFlushReg}
     io.out.bits.brMask := brMaskPReg
@@ -286,15 +299,15 @@ class RS(size: Int = 2, pipelined: Boolean = true, fifo: Boolean = false, priori
       when(!robStoreInstVec(i)){stMaskReg(i) := false.B}
     })
     when(io.in.fire() && LSUOpType.needMemWrite(io.in.bits.decode.ctrl.fuOpType)){
-      stMaskReg(io.in.bits.prfDest(prfAddrWidth-1,1)) := true.B
+      stMaskReg(io.in.bits.prfDest(physRegFileAddrWidth - 1, 1)) := true.B
     }
     when(io.in.fire()){
       stMask(enqueueSelect) := stMaskReg
     }
     when(io.out.fire()){
-      stMaskReg(io.out.bits.prfDest(prfAddrWidth-1,1)) := false.B
+      stMaskReg(io.out.bits.prfDest(physRegFileAddrWidth - 1, 1)) := false.B
       (0 until rsSize).map(i => {
-        stMask(i)(io.out.bits.prfDest(prfAddrWidth-1,1)) := false.B
+        stMask(i)(io.out.bits.prfDest(physRegFileAddrWidth - 1, 1)) := false.B
       })
     }
     when(io.flush){(0 until robSize).map(i => {

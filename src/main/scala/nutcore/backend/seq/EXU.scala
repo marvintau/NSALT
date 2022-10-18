@@ -25,6 +25,8 @@ import bus.simplebus._
 import top.Settings
 import difftest._
 
+import nutcore.frontend.fetch.branch_predict._
+
 class EXU(implicit val p: NutCoreConfig) extends NutCoreModule {
   val io = IO(new Bundle {
     val in = Flipped(Decoupled(new DecodeIO))
@@ -34,7 +36,7 @@ class EXU(implicit val p: NutCoreConfig) extends NutCoreModule {
     val forward = new ForwardIO
     val memMMU = Flipped(new MemMMUIO)
 
-    // val bpuUpdateReq = new BranchPredictUpdateRequestPort()
+    val bpuUpdateReq = new BranchPredictUpdateRequestPort()
   })
 
   val src1 = io.in.bits.data.src1(XLEN-1,0)
@@ -50,7 +52,7 @@ class EXU(implicit val p: NutCoreConfig) extends NutCoreModule {
   alu.io.cfIn := io.in.bits.cf
   alu.io.offset := io.in.bits.data.imm
   alu.io.out.ready := true.B
-  // io.bpuUpdateReq := alu.io.bpuUpdateReq
+  io.bpuUpdateReq := alu.io.bpuUpdateReq
 
   def isBru(func: UInt) = func(4)
 

@@ -177,7 +177,7 @@ trait HasExceptionNO {
 
 
 class CSRIO extends FunctionUnitIO {
-  val cfIn = Flipped(new CtrlFlowIO)
+  val cfIn = Flipped(new InstrStreamPort)
   val redirect = new RedirectIO
   // for exception check
   val instrValid = Input(Bool())

@@ -93,7 +93,15 @@ class CoherenceManager extends Module with HasCoherenceParameter {
       io.out.mem.req.valid := true.B
       when (io.out.mem.req.fire()) { state := s_memReadResp }
     }
-    is (s_memReadResp) { when (io.out.mem.resp.fire() && io.out.mem.resp.bits.isReadLast()) { state := s_idle } }
-    is (s_memWriteResp) { when (io.out.mem.resp.fire()) { state := s_idle } }
+    is (s_memReadResp) { 
+      when (io.out.mem.resp.fire() && io.out.mem.resp.bits.isReadLast()) { 
+        state := s_idle
+       } 
+    }
+    is (s_memWriteResp) { 
+      when (io.out.mem.resp.fire()) {
+        state := s_idle 
+      } 
+    }
   }
 }

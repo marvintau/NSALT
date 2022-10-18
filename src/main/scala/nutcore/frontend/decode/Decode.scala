@@ -13,7 +13,7 @@ import nutcore._
 
 class Decoder(implicit val p: NutCoreConfig) extends NutCoreModule with HasInstrType {
   val io = IO(new Bundle {
-    val in = Flipped(Decoupled(new CtrlFlowIO))
+    val in = Flipped(Decoupled(new InstrStreamPort))
     val out = Decoupled(new DecodeIO)
     val isWFI = Output(Bool()) // require NutCoreSim to advance mtime when wfi to reduce the idle time in Linux
     val isBranch = Output(Bool())

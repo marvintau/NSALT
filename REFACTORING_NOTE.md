@@ -66,4 +66,8 @@ space when testing.
 
 2. Remove all `sealed` keywords for further code splitting.
 
-3. Change `BoringUtils` into normal port definition with `IO` and `Bundle`
+3. Eliminating all occurrences of `BoringUtils` by replacing them with 
+   normal port definition with `IO` and `Bundle`
+
+4. Change `IO` affix to `Port`, since `IO` usually indicates a data type,
+   while `Port` indicates its usage.

@@ -16,7 +16,7 @@
 
 package nutcore.frontend
 
-import nutcore.fetch.{
+import nutcore.frontend.fetch.{
   Dynamic => FetchDynamic,
 }
 

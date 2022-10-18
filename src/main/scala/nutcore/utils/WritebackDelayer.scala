@@ -20,6 +20,7 @@ import chisel3._
 import chisel3.util._
 
 import utils._
+import nutcore.backend._
 
 class WritebackDelayer(bru: Boolean = false, name: String = "unnamedDelayer") extends NutCoreModule with HasRSConst with HasBackendConst {
   val io = IO(new Bundle {

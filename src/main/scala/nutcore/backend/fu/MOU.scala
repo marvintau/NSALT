@@ -30,7 +30,7 @@ object MOUOpType {
 }
 
 class MOUIO extends FunctionUnitIO {
-  val cfIn = Flipped(new CtrlFlowIO)
+  val cfIn = Flipped(new InstrStreamPort)
   val redirect = new RedirectIO
 }
 

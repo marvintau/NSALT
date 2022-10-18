@@ -28,7 +28,7 @@ import nutcore._
 
 class IDU(implicit val p: NutCoreConfig) extends NutCoreModule with HasInstrType {
   val io = IO(new Bundle {
-    val in = Vec(2, Flipped(Decoupled(new CtrlFlowIO)))
+    val in = Vec(2, Flipped(Decoupled(new InstrStreamPort)))
     val out = Vec(2, Decoupled(new DecodeIO))
   })
   val decoder1  = Module(new Decoder)

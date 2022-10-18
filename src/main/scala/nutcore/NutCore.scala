@@ -28,6 +28,7 @@ import nutcore.frontend.{
   Sequential => FrontEndSequential,
   Embedded => FrontEndEmbedded,
 }
+import nutcore.backend._
 
 import bus.simplebus._
 import bus.axi4._
@@ -115,7 +116,7 @@ class NutCore(implicit val p: NutCoreConfig) extends NutCoreModule {
   // Backend
   if (EnableOutOfOrderExec) {
     val mmioXbar = Module(new SimpleBusCrossbarNto1(if (HasDcache) 2 else 3))
-    val backend = Module(new Backend_ooo)
+    val backend = Module(new BackEndDynamic)
     PipelineVector2Connect(new DecodeIO, frontend.io.out(0), frontend.io.out(1), backend.io.in(0), backend.io.in(1), frontend.io.flushVec(1), 16)
     backend.io.flush := frontend.io.flushVec(2)
     frontend.io.redirect <> backend.io.redirect
@@ -152,7 +153,7 @@ class NutCore(implicit val p: NutCoreConfig) extends NutCoreModule {
     io.mmio <> mmioXbar.io.out
 
   } else {
-    val backend = Module(new Backend_inorder)
+    val backend = Module(new BackEndSequential)
 
     PipelineVector2Connect(new DecodeIO, frontend.io.out(0), frontend.io.out(1), backend.io.in(0), backend.io.in(1), frontend.io.flushVec(1), 4)
 
